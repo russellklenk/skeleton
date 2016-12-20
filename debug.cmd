@@ -22,12 +22,14 @@ IF [%1] NEQ [] (
     ECHO Unrecognized target architecture %1; expect "x86" or "x64". Debugging x64 by default.
     SET TARGET_ARCHITECTURE="x64"
     SET VS_ARCHITECTURE=x64
+    GOTO SELECT_OUTPUTS
 )
 ECHO No target architecture specified. Building x64 by default.
 SET TARGET_ARCHITECTURE="x64"
 SET VS_ARCHITECTURE=x64
 
 :: Select the EXE and PDB to use based on the target architecture.
+:SELECT_OUTPUTS
 IF %TARGET_ARCHITECTURE% == "x86" (
     SET PROJECT_EXE=%PROJECT_EXE_X86%
     SET PROJECT_PDB=%PROJECT_PDB_X86%
