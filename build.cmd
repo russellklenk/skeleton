@@ -107,9 +107,58 @@ IF %BUILD_STORE% == 1 (
     )
 )
 
+:: Create the project output directories
+IF NOT EXIST %PROJECT_OUT_ALL% MKDIR %PROJECT_OUT_ALL%
+IF NOT EXIST %PROJECT_OUT_X86% MKDIR %PROJECT_OUT_X86%
+IF NOT EXIST %PROJECT_OUT_X64% MKDIR %PROJECT_OUT_X64%
+
+:: Setup for Vulkan SDK
+IF [%VULKAN_SDK%] NEQ [] (
+    IF NOT EXIST %VULKAN_SDK% (
+        ECHO ERROR: Check VULKAN_SDK. It could not be found at %VULKAN_SDK%.
+        GOTO BUILD_FAILED
+    )
+    ECHO Using Vulkan SDK located at %VULKAN_SDK%...
+    SET HAS_VULKAN=1
+) ELSE (
+    SET HAS_VULKAN=0
+    SET VULKAN_INCLUDES=
+    SET VULKAN_LOADER_DLL=
+    SET VULKAN_LOADER_PDB=
+    SET SPIRV_COMPILER=
+    SET GLSLC_COMPILER=
+)
+IF %TARGET_ARCHITECTURE% == "x86" (
+    SET VULKAN_LOADER_DLL="%VULKAN_SDK%\Source\lib32\vulkan-1.dll"
+    SET VULKAN_LOADER_PDB="%VULKAN_SDK%\Source\lib32\vulkan-1.pdb"
+    SET SPIRV_COMPILER="%VULKAN_SDK%\Bin32\glslangValidator.exe"
+    SET GLSLC_COMPILER="%VULKAN_SDK%\Bin32\glslc.exe"
+)
+IF %TARGET_ARCHITECTURE% == "x64" (
+    SET VULKAN_LOADER_PDB="%VULKAN_SDK%\Source\lib\vulkan-1.pdb"
+    SET VULKAN_LOADER_DLL="%VULKAN_SDK%\Source\lib\vulkan-1.dll"
+    SET SPIRV_COMPILER="%VULKAN_SDK%\Bin\glslangValidator.exe"
+    SET GLSLC_COMPILER="%VULKAN_SDK%\Bin\glslc.exe"
+)
+IF %HAS_VULKAN% == 1 (
+    IF EXIST %VULKAN_LOADER_DLL% (
+        IF NOT EXIST %PROJECT_OUT%\vulkan-1.dll (
+            ECHO Copying %VULKAN_LOADER_DLL% to %PROJECT_OUT%...
+            XCOPY %VULKAN_LOADER_DLL% %PROJECT_OUT% /Y /Q
+        )
+    )
+    IF EXIST %VULKAN_LOADER_PDB% (
+        IF NOT EXIST %PROJECT_OUT%\vulkan-1.pdb (
+            ECHO Copying %VULKAN_LOADER_PDB% to %PROJECT_OUT%...
+            XCOPY %VULKAN_LOADER_PDB% %PROJECT_OUT% /Y /Q
+        )
+    )
+    SET VULKAN_INCLUDES=-I%VULKAN_SDK%\Include
+)
+
 :: Add your additional include directories and libraries to link with below.
 :: The build runs from within the output directory (ie. .\build\x64).
-SET INCLUDES=-I..\..\include -I..\..\src
+SET INCLUDES=%VULKAN_INCLUDES% -I..\..\include -I..\..\src
 SET LIBRARIES=User32.lib Gdi32.lib Shell32.lib Advapi32.lib Comdlg32.lib winmm.lib %PROJECT_LIB%\*.lib
 
 :: Set your preprocessor defines, compiler flags and linker flags for debug configurations.
@@ -127,13 +176,13 @@ IF %BUILD_CONFIGURATION% == "debug" (
     SET DEFINES=%DEFINES_DEBUG%
     SET CPPFLAGS=%CPPFLAGS_DEBUG%
     SET LNKFLAGS=%LNKFLAGS_DEBUG%
-    ECHO Building debug configuration...
+    ECHO Building debug %VS_ARCHITECTURE% configuration...
 )
 IF %BUILD_CONFIGURATION% == "release" (
     SET DEFINES=%DEFINES_RELEASE%
     SET CPPFLAGS=%CPPFLAGS_RELEASE%
     SET LNKFLAGS=%LNKFLAGS_RELEASE%
-    ECHO Building release configuration...
+    ECHO Building release %VS_ARCHITECTURE% configuration...
 )
 
 :: Select the version of Visual C++ to use when building the project.
@@ -147,11 +196,6 @@ SET MSBUILD="%ProgramFiles(x86)%\MsBuild\%VSVERSION%\Bin\MsBuild.exe"
 IF NOT DEFINED DevEnvDir (
     CALL %VSVARSBAT% %VS_ARCHITECTURE% %PROJECT_WINSDK%
 )
-
-:: Create the project output directories
-IF NOT EXIST %PROJECT_OUT_ALL% MKDIR %PROJECT_OUT_ALL%
-IF NOT EXIST %PROJECT_OUT_X86% MKDIR %PROJECT_OUT_X86%
-IF NOT EXIST %PROJECT_OUT_X64% MKDIR %PROJECT_OUT_X64%
 
 :: Build the output executable.
 IF %BUILD_DESKTOP% == 1 (
